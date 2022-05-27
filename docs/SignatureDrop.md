@@ -556,7 +556,7 @@ function hasRoleWithSwitch(bytes32 role, address account) external view returns 
 ### initialize
 
 ```solidity
-function initialize(address _defaultAdmin, string _name, string _symbol, string _contractURI, address[] _trustedForwarders, address _saleRecipient, address _royaltyRecipient, uint128 _royaltyBps, uint128 _platformFeeBps, address _platformFeeRecipient, address _signatureMintLogic) external nonpayable
+function initialize(address _defaultAdmin, string _name, string _symbol, string _contractURI, address[] _trustedForwarders, address _saleRecipient, address _royaltyRecipient, uint128 _royaltyBps, uint128 _platformFeeBps, address _platformFeeRecipient) external nonpayable
 ```
 
 
@@ -577,7 +577,6 @@ function initialize(address _defaultAdmin, string _name, string _symbol, string 
 | _royaltyBps | uint128 | undefined
 | _platformFeeBps | uint128 | undefined
 | _platformFeeRecipient | address | undefined
-| _signatureMintLogic | address | undefined
 
 ### isApprovedForAll
 
@@ -1039,23 +1038,6 @@ function setRoyaltyInfoForToken(uint256 _tokenId, address _recipient, uint256 _b
 | _tokenId | uint256 | undefined
 | _recipient | address | undefined
 | _bps | uint256 | undefined
-
-### sigMint
-
-```solidity
-function sigMint() external view returns (address)
-```
-
-
-
-*The address of the contract with signature minting logic.*
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | address | undefined
 
 ### supportsInterface
 

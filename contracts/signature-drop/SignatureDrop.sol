@@ -28,6 +28,8 @@ import "../feature/PermissionsEnumerable.sol";
 import "../feature/meta-tx/Drop.sol";
 import "../feature/interface/ISignatureMintERC721.sol";
 
+import { SignatureMintERC721 } from "../feature/lib/SignatureMintERC721.sol";
+
 contract SignatureDrop is
     Initializable,
     ContractMetadata,
@@ -65,7 +67,9 @@ contract SignatureDrop is
     uint256 public nextTokenIdToMint;
 
     /// @dev The address of the contract with signature minting logic.
-    address public sigMint;
+    // address public sigMint;
+
+    SignatureMintERC721.Minted private minted;
 
     /*///////////////////////////////////////////////////////////////
                                 Events
@@ -95,8 +99,7 @@ contract SignatureDrop is
         address _royaltyRecipient,
         uint128 _royaltyBps,
         uint128 _platformFeeBps,
-        address _platformFeeRecipient,
-        address _signatureMintLogic
+        address _platformFeeRecipient
     ) external initializer {
         // Initialize inherited contracts, most base-like -> most derived.
         __ReentrancyGuard_init();
@@ -107,7 +110,7 @@ contract SignatureDrop is
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
         // Initialize this contract's state.
-        sigMint = _signatureMintLogic;
+        // sigMint = _signatureMintLogic;
 
         setContractURI(_contractURI);
         setOwner(_defaultAdmin);
@@ -208,7 +211,7 @@ contract SignatureDrop is
         nonReentrant
         returns (address signer)
     {
-        signer = ISignatureMintERC721(sigMint).mintWithSignature(_req, _signature);
+        signer = SignatureMintERC721.processRequest(minted, _req, _signature);
 
         uint256 tokenIdToMint = _currentIndex;
         require(tokenIdToMint + _req.quantity <= nextTokenIdToMint, "not enough minted tokens.");
@@ -243,12 +246,18 @@ contract SignatureDrop is
         view
         returns (bool success, address signer)
     {
-        return ISignatureMintERC721(sigMint).verify(_req, _signature);
+        (success, signer) = SignatureMintERC721.verify(minted, _req, _signature);
+        return (success && _isAuthorizedSigner(signer), signer);
     }
 
     /*///////////////////////////////////////////////////////////////
                         Internal functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Returns whether a given address is authorized to sign mint requests.
+    function _isAuthorizedSigner(address _signer) internal view returns (bool) {
+        return hasRole(MINTER_ROLE, _signer);
+    }
 
     /// @dev Runs before every `claim` function call.
     function _beforeClaim(
