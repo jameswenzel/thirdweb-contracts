@@ -3,51 +3,52 @@ pragma solidity ^0.8.11;
 
 //  ==========  External imports    ==========
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import { ERC721A } from "ERC721A/ERC721A.sol";
 
-import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+import { IERC2981 } from "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import { IERC165 } from "@openzeppelin/contracts/interfaces/IERC165.sol";
+import { BitMapsUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/structs/BitMapsUpgradeable.sol";
+import { AccessControlEnumerable } from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/BitMapsUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
-
+import { Multicall } from "@openzeppelin/contracts/utils/Multicall.sol";
+import { ReentrancyGuard } from "@solmate/utils/ReentrancyGuard.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 //  ==========  Internal imports    ==========
 
 import { IDropERC721 } from "../interfaces/drop/IDropERC721.sol";
 import { ITWFee } from "../interfaces/ITWFee.sol";
-import "../interfaces/IThirdwebContract.sol";
+import { IThirdwebContract } from "../interfaces/IThirdwebContract.sol";
 
 //  ==========  Features    ==========
 
-import "../feature/interface/IPlatformFee.sol";
-import "../feature/interface/IPrimarySale.sol";
-import "../feature/interface/IRoyalty.sol";
-import "../feature/interface/IOwnable.sol";
+import { IPlatformFee } from "../feature/interface/IPlatformFee.sol";
+import { IPrimarySale } from "../feature/interface/IPrimarySale.sol";
+import { IRoyalty } from "../feature/interface/IRoyalty.sol";
+import { IOwnable } from "../feature/interface/IOwnable.sol";
 
-import "../openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol";
+// import "../openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol";
 
 import "../lib/CurrencyTransferLib.sol";
-import "../lib/FeeType.sol";
-import "../lib/MerkleProof.sol";
+import { FeeType } from "../lib/FeeType.sol";
+import { MerkleProof } from "../lib/MerkleProof.sol";
 
+// Initializable,
 contract DropERC721 is
-    Initializable,
     IThirdwebContract,
     IOwnable,
     IRoyalty,
     IPrimarySale,
     IPlatformFee,
-    ReentrancyGuardUpgradeable,
-    ERC2771ContextUpgradeable,
-    MulticallUpgradeable,
-    AccessControlEnumerableUpgradeable,
-    ERC721EnumerableUpgradeable,
+    ReentrancyGuard,
+    // ReentrancyGuardUpgradeable,
+    // ERC2771ContextUpgradeable,
+    Multicall,
+    AccessControlEnumerable,
+    ERC721A,
     IDropERC721
 {
     using BitMapsUpgradeable for BitMapsUpgradeable.BitMap;
-    using StringsUpgradeable for uint256;
+    using Strings for uint256;
 
     /*///////////////////////////////////////////////////////////////
                             State variables
@@ -132,28 +133,36 @@ contract DropERC721 is
                     Constructor + initializer logic
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _thirdwebFee) initializer {
+    constructor(address _thirdwebFee) ERC721A("Test", "TEST") {
         thirdwebFee = ITWFee(_thirdwebFee);
+        royaltyRecipient = msg.sender;
+        royaltyBps = 1000;
+        primarySaleRecipient = msg.sender;
+        // contractURI = _contractURI;
+        _owner = msg.sender;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(MINTER_ROLE, msg.sender);
+        _setupRole(TRANSFER_ROLE, msg.sender);
+        _setupRole(TRANSFER_ROLE, address(0));
     }
 
-    /// @dev Initiliazes the contract, like a constructor.
+    // /// @dev Initiliazes the contract, like a constructor.
     function initialize(
         address _defaultAdmin,
-        string memory _name,
-        string memory _symbol,
+        string memory,
+        string memory,
         string memory _contractURI,
-        address[] memory _trustedForwarders,
+        address[] memory,
         address _saleRecipient,
         address _royaltyRecipient,
         uint128 _royaltyBps,
         uint128 _platformFeeBps,
         address _platformFeeRecipient
-    ) external initializer {
+    ) external {
         // Initialize inherited contracts, most base-like -> most derived.
-        __ReentrancyGuard_init();
-        __ERC2771Context_init(_trustedForwarders);
-        __ERC721_init(_name, _symbol);
-
+        // __ReentrancyGuard_init();
+        // __ERC2771Context_init(_trustedForwarders);
+        // __ERC721_init(_name, _symbol);
         // Initialize this contract's state.
         royaltyRecipient = _royaltyRecipient;
         royaltyBps = uint16(_royaltyBps);
@@ -162,7 +171,6 @@ contract DropERC721 is
         primarySaleRecipient = _saleRecipient;
         contractURI = _contractURI;
         _owner = _defaultAdmin;
-
         _setupRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
         _setupRole(MINTER_ROLE, _defaultAdmin);
         _setupRole(TRANSFER_ROLE, _defaultAdmin);
@@ -214,10 +222,10 @@ contract DropERC721 is
         public
         view
         virtual
-        override(ERC721EnumerableUpgradeable, AccessControlEnumerableUpgradeable, IERC165Upgradeable)
+        override(ERC721A, AccessControlEnumerable)
         returns (bool)
     {
-        return super.supportsInterface(interfaceId) || type(IERC2981Upgradeable).interfaceId == interfaceId;
+        return ERC721A.supportsInterface(interfaceId) || type(IERC2981).interfaceId == interfaceId;
     }
 
     /// @dev Returns the royalty recipient and amount, given a tokenId and sale price.
@@ -330,7 +338,7 @@ contract DropERC721 is
         bytes32[] calldata _proofs,
         uint256 _proofMaxQuantityPerTransaction
     ) external payable nonReentrant {
-        require(isTrustedForwarder(msg.sender) || _msgSender() == tx.origin, "BOT");
+        // require(_msgSender() == tx.origin, "BOT");
 
         uint256 tokenIdToClaim = nextTokenIdToClaim;
 
@@ -718,12 +726,13 @@ contract DropERC721 is
     }
 
     /// @dev See {ERC721-_beforeTokenTransfer}.
-    function _beforeTokenTransfer(
+    function _beforeTokenTransfers(
         address from,
         address to,
-        uint256 tokenId
-    ) internal virtual override(ERC721EnumerableUpgradeable) {
-        super._beforeTokenTransfer(from, to, tokenId);
+        uint256 tokenId,
+        uint256 quantity
+    ) internal virtual override(ERC721A) {
+        super._beforeTokenTransfers(from, to, tokenId, quantity);
 
         // if transfer is restricted on the contract, we still want to allow burning and minting
         if (!hasRole(TRANSFER_ROLE, address(0)) && from != address(0) && to != address(0)) {
@@ -731,23 +740,10 @@ contract DropERC721 is
         }
     }
 
-    function _msgSender()
-        internal
-        view
-        virtual
-        override(ContextUpgradeable, ERC2771ContextUpgradeable)
-        returns (address sender)
-    {
-        return ERC2771ContextUpgradeable._msgSender();
-    }
-
-    function _msgData()
-        internal
-        view
-        virtual
-        override(ContextUpgradeable, ERC2771ContextUpgradeable)
-        returns (bytes calldata)
-    {
-        return ERC2771ContextUpgradeable._msgData();
+    function _isApprovedOrOwner(address operator, uint256 tokenId) internal view virtual returns (bool) {
+        address approvedAddress = getApproved(tokenId);
+        return (_msgSenderERC721A() == operator ||
+            isApprovedForAll(operator, _msgSenderERC721A()) ||
+            approvedAddress == _msgSenderERC721A());
     }
 }

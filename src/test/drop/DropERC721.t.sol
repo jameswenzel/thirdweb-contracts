@@ -213,7 +213,7 @@ contract DropERC721Test is BaseTest {
         bytes32[] memory proofs = new bytes32[](0);
 
         vm.startPrank(getActor(5));
-        vm.expectRevert(bytes("BOT"));
+        vm.expectRevert("REENTRANCY");
         masterExploit.performExploit(
             address(masterExploit),
             conditions[0].quantityLimitPerTransaction,
